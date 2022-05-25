@@ -54,7 +54,10 @@ app.MapPut("/notes/{id:int}", async(int id, Note n, NoteDb db)=> {
 
     //if note is found then
     note.text = n.text;
-    note.done = n.done;
+    note.status = n.status;
+    note.name = n.name;
+    note.userId = n.userId;
+    note.created = DateTime.Now;
     await db.SaveChangesAsync();
     return Results.Ok();
 });
@@ -73,8 +76,25 @@ app.Run();
 
 record Note(int id){
     public string text {get;set;} = default!;
-    public bool done {get;set;} = default!;
+    public string name { get; set; } = default!;
+    public string status {get;set;} = default!;
+
+    public int userId { get; set; } = default!;
+
+    public DateTime created { get; set; } = default!;
+
+    public DateTime updated { get; set; } = default!;
 }
+/*
+Todo:
+● Id: Unique identifier
+● Name: Name of the todo item
+● Description (optional): Description of the toto item
+● User id: Id of the user who owns this todo item
+● Created timestamp: When the item is created
+● Updated timestamp: When the item is last updated
+● Status: An enum of either: NotStarted, OnGoing, Completed
+*/
 
 class NoteDb: DbContext {
     public NoteDb(DbContextOptions<NoteDb> options): base(options) {
