@@ -58,11 +58,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapGet("/", () => "Welcome to Notes API!");
-app.MapGet("/notes", [Authorize] async (NoteDb db) => await db.Notes.ToListAsync());
+app.MapGet("/api/v1", () => "Welcome to Notes API!");
+app.MapGet("/api/v1/notes", [Authorize] async (NoteDb db) => await db.Notes.ToListAsync());
 
 /* POST request for the Note(Todo) item */
-app.MapPost("/notes/", [Authorize] async(Note n, NoteDb db)=> {
+app.MapPost("/api/v1/notes/", [Authorize] async(Note n, NoteDb db)=> {
     db.Notes.Add(n);
     await db.SaveChangesAsync();
 
@@ -70,7 +70,7 @@ app.MapPost("/notes/", [Authorize] async(Note n, NoteDb db)=> {
 });
 
 /* GET request */
-app.MapGet("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
+app.MapGet("/api/v1/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
     return await db.Notes.FindAsync(id)
         is Note n
         ? Results.Ok(n)
@@ -78,7 +78,7 @@ app.MapGet("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
 });
 
 /* PUT request to update the note*/
-app.MapPut("/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
+app.MapPut("/api/v1/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
     if (n.id != id)
     {
         return Results.BadRequest();
@@ -98,7 +98,7 @@ app.MapPut("/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
 });
 
 /* DELETE request */
-app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
+app.MapDelete("/api/v1/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
     var note = await db.Notes.FindAsync(id);
     if (note is not null) {
         db.Notes.Remove(note);
@@ -109,7 +109,7 @@ app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
 
 /* SIGNIN request */
 /* https://dev.to/moe23/net-6-minimal-api-authentication-jwt-with-swagger-and-open-api-2chh */
-app.MapPost("/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
+app.MapPost("/api/v1/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
     UserDto loginattempt = db.UserDtos.SingleOrDefault(u => u.username == user.username);
     /*
     if the user is not found it will return 401
@@ -153,7 +153,7 @@ app.MapPost("/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
 });
 
 /* sign the user up, requires to be logged in */
-app.MapPost("/signup", [Authorize] async (UserDto user, UserDb db)=> {
+app.MapPost("/api/v1/signup", [Authorize] async (UserDto user, UserDb db)=> {
     // generate a 128-bit salt using a cryptographically strong random sequence of nonzero values
         user.salt = new byte[128 / 8];
         using (var rngCsp = new RNGCryptoServiceProvider())
@@ -172,7 +172,7 @@ app.MapPost("/signup", [Authorize] async (UserDto user, UserDb db)=> {
     return Results.Created($"/users/{user.userId}", user);
 });
 /* PUT request to change password of a user */
-app.MapPut("/changePassword", [Authorize] async (passwordChange pc, UserDb db)=> {
+app.MapPut("/api/v1/changePassword", [Authorize] async (passwordChange pc, UserDb db)=> {
     UserDto foundUser = db.UserDtos.SingleOrDefault(u => u.username == pc.username);
     if (foundUser is null)
     {
@@ -187,7 +187,7 @@ app.MapPut("/changePassword", [Authorize] async (passwordChange pc, UserDb db)=>
             iterationCount: 100000,
             numBytesRequested: 256 / 8));
     updatedUser.password = hashed;
-    //updatedUser.userUpdated = DateTime.Now;
+    updatedUser.userUpdated = DateTime.Now;
     await db.SaveChangesAsync();
 
     return Results.Ok();
