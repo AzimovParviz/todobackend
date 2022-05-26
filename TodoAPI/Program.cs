@@ -108,10 +108,12 @@ app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
 });
 
 app.MapPost("/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
-    if(user.username == db.UserDtos.Find(user.username).username 
-    && user.password == Convert.ToBase64String(KeyDerivation.Pbkdf2(
+    UserDto loginattempt = db.UserDtos.SingleOrDefault(u => u.username == user.username);
+    //User user = db.User.SingleOrDefault(o => o.Email == user1.Email)       
+    if(user.username == loginattempt.username
+    && loginattempt.password == Convert.ToBase64String(KeyDerivation.Pbkdf2(
             password: user.password,
-            salt: user.salt,
+            salt: loginattempt.salt,
             prf: KeyDerivationPrf.HMACSHA256,
             iterationCount: 100000,
             numBytesRequested: 256 / 8)))
