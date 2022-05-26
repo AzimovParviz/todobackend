@@ -37,6 +37,10 @@ namespace NotesMinimalAPI.Migrations.UserDbMigrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<byte[]>("salt")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
                     b.Property<DateTime>("userCreated")
                         .HasColumnType("timestamp with time zone");
 

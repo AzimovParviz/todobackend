@@ -18,10 +18,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 // Connect to PostgreSQL Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var userConnectionString = builder.Configuration.GetConnectionString("UserConnection");
 builder.Services.AddDbContext<NoteDb>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddDbContext<UserDb>(options=> 
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(userConnectionString));
 // Add JWT configuration
 builder.Services.AddAuthentication(o =>
 {
@@ -106,8 +107,14 @@ app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
     return Results.NoContent();
 });
 
-app.MapPost("/signin", [AllowAnonymous] (UserDto user) => {
-    if(user.username == "admin" && user.password == "admin")
+app.MapPost("/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
+    if(user.username == db.UserDtos.Find(user.username).username 
+    && user.password == Convert.ToBase64String(KeyDerivation.Pbkdf2(
+            password: user.password,
+            salt: user.salt,
+            prf: KeyDerivationPrf.HMACSHA256,
+            iterationCount: 100000,
+            numBytesRequested: 256 / 8)))
     {
         var secureKey = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]);
 
@@ -139,7 +146,7 @@ app.MapPost("/signin", [AllowAnonymous] (UserDto user) => {
     return Results.Unauthorized();
 });
 
-app.MapPost("/signup", [Authorize] async (UserDto user, UserDb db)=> {
+app.MapPost("/signup", [AllowAnonymous] async (UserDto user, UserDb db)=> {
     // generate a 128-bit salt using a cryptographically strong random sequence of nonzero values
         user.salt = new byte[128 / 8];
         using (var rngCsp = new RNGCryptoServiceProvider())
@@ -163,7 +170,7 @@ record UserDto (string username)
 {
     [Key]
     public int userId { get; set; }
-    public byte[] salt { get; set; }
+    public byte[] salt { get; set; } 
     public string password { get; set; }
     public string email { get; set; } = default!;
 
