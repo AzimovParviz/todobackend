@@ -1,5 +1,10 @@
 using Microsoft.EntityFrameworkCore; // place this line at the beginning of file.
-
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
+using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,10 +16,33 @@ builder.Services.AddSwaggerGen();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<NoteDb>(options =>
     options.UseNpgsql(connectionString));
+// Add JWT configuration
+builder.Services.AddAuthentication(o =>
+{
+    o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(o =>
+{
+    o.TokenValidationParameters = new TokenValidationParameters
+    {
+       ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey
+            (Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = false,
+        ValidateIssuerSigningKey = true
+    };
+});
 
+builder.Services.AddAuthorization();
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -24,10 +52,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/", () => "Welcome to Notes API!");
-app.MapGet("/notes", async (NoteDb db) => await db.Notes.ToListAsync());
+app.MapGet("/notes", [Authorize] async (NoteDb db) => await db.Notes.ToListAsync());
 
-/* POST request */
-app.MapPost("/notes/", async(Note n, NoteDb db)=> {
+/* POST request for the Note(Todo) item */
+app.MapPost("/notes/", [Authorize] async(Note n, NoteDb db)=> {
     db.Notes.Add(n);
     await db.SaveChangesAsync();
 
@@ -35,7 +63,7 @@ app.MapPost("/notes/", async(Note n, NoteDb db)=> {
 });
 
 /* GET request */
-app.MapGet("/notes/{id:int}", async(int id, NoteDb db)=> {
+app.MapGet("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
     return await db.Notes.FindAsync(id)
         is Note n
         ? Results.Ok(n)
@@ -43,7 +71,7 @@ app.MapGet("/notes/{id:int}", async(int id, NoteDb db)=> {
 });
 
 /* UPDATE request */
-app.MapPut("/notes/{id:int}", async(int id, Note n, NoteDb db)=> {
+app.MapPut("/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
     if (n.id != id)
     {
         return Results.BadRequest();
@@ -63,7 +91,7 @@ app.MapPut("/notes/{id:int}", async(int id, Note n, NoteDb db)=> {
 });
 
 /* DELETE request */
-app.MapDelete("/notes/{id:int}", async(int id, NoteDb db)=>{
+app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
     var note = await db.Notes.FindAsync(id);
     if (note is not null) {
         db.Notes.Remove(note);
@@ -72,12 +100,46 @@ app.MapDelete("/notes/{id:int}", async(int id, NoteDb db)=>{
     return Results.NoContent();
 });
 
+app.MapPost("/signin", [AllowAnonymous] (UserDto user) => {
+    if(user.username == "parviz" && user.password == "azimov")
+    {
+        var secureKey = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]);
+
+        var issuer = builder.Configuration["Jwt:Issuer"];
+        var audience = builder.Configuration["Jwt:Audience"];
+        var securityKey = new SymmetricSecurityKey(secureKey);
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512);
+
+        var jwtTokenHandler = new JwtSecurityTokenHandler();
+
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new [] {
+                new Claim("Id", "1"),
+                new Claim(JwtRegisteredClaimNames.Sub, user.username),
+                new Claim(JwtRegisteredClaimNames.Email, user.username),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            }),
+            Expires = DateTime.Now.AddMinutes(5),
+            Audience = audience,
+            Issuer = issuer,
+            SigningCredentials = credentials
+        };
+
+        var token = jwtTokenHandler.CreateToken(tokenDescriptor);
+        var jwtToken = jwtTokenHandler.WriteToken(token);
+        return Results.Ok(jwtToken);  
+    }
+    return Results.Unauthorized();
+});
+
 app.Run();
+record UserDto (string username, string password);
 
 record Note(int id){
     public string text {get;set;} = default!;
     public string name { get; set; } = default!;
-    public string status {get;set;} = default!;
+    public string status {get;set;} = default!;//needs to be enum
 
     public int userId { get; set; } = default!;
 
