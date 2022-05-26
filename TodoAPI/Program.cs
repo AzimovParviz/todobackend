@@ -2,9 +2,13 @@ using Microsoft.EntityFrameworkCore; // place this line at the beginning of file
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
 using System.Text;
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Cryptography.KeyDerivation;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +19,8 @@ builder.Services.AddSwaggerGen();
 // Connect to PostgreSQL Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<NoteDb>(options =>
+    options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<UserDb>(options=> 
     options.UseNpgsql(connectionString));
 // Add JWT configuration
 builder.Services.AddAuthentication(o =>
@@ -101,7 +107,7 @@ app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
 });
 
 app.MapPost("/signin", [AllowAnonymous] (UserDto user) => {
-    if(user.username == "parviz" && user.password == "azimov")
+    if(user.username == "admin" && user.password == "admin")
     {
         var secureKey = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]);
 
@@ -133,8 +139,47 @@ app.MapPost("/signin", [AllowAnonymous] (UserDto user) => {
     return Results.Unauthorized();
 });
 
+app.MapPost("/signup", [Authorize] async (UserDto user, UserDb db)=> {
+    // generate a 128-bit salt using a cryptographically strong random sequence of nonzero values
+        user.salt = new byte[128 / 8];
+        using (var rngCsp = new RNGCryptoServiceProvider())
+        {
+            rngCsp.GetNonZeroBytes(user.salt);
+        }
+        user.password = Convert.ToBase64String(KeyDerivation.Pbkdf2(
+            password: user.password,
+            salt: user.salt,
+            prf: KeyDerivationPrf.HMACSHA256,
+            iterationCount: 100000,
+            numBytesRequested: 256 / 8));
+    db.UserDtos.Add(user);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/users/{user.userId}", user);
+});
+
 app.Run();
-record UserDto (string username, string password);
+record UserDto (string username)
+{
+    [Key]
+    public int userId { get; set; }
+    public byte[] salt { get; set; }
+    public string password { get; set; }
+    public string email { get; set; } = default!;
+
+    public DateTime userCreated { get; set; } = default!;
+
+    public DateTime userUpdated { get; set; } = default!;
+}
+/*
+User:
+● Id: Unique identifier
+● Email: Email address
+● Password: Hash of the password
+● Created timestamp: When the user is created
+● Updated timestamp: When the user is last updated
+
+*/
 
 record Note(int id){
     public string text {get;set;} = default!;
@@ -163,4 +208,10 @@ class NoteDb: DbContext {
 
     }
     public DbSet<Note> Notes => Set<Note>();
+}
+class UserDb: DbContext {
+    public UserDb(DbContextOptions<UserDb> options): base(options) {
+
+    }
+    public DbSet<UserDto> UserDtos => Set<UserDto>();
 }
