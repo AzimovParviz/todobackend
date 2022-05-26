@@ -77,7 +77,7 @@ app.MapGet("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
         : Results.NotFound();
 });
 
-/* UPDATE request */
+/* PUT request to update the note*/
 app.MapPut("/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
     if (n.id != id)
     {
@@ -92,7 +92,7 @@ app.MapPut("/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
     note.status = n.status;
     note.name = n.name;
     note.userId = n.userId;
-    note.created = DateTime.Now;
+    note.updated = DateTime.Now;
     await db.SaveChangesAsync();
     return Results.Ok();
 });
@@ -107,9 +107,13 @@ app.MapDelete("/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
     return Results.NoContent();
 });
 
+/* SIGNIN request */
+/* https://dev.to/moe23/net-6-minimal-api-authentication-jwt-with-swagger-and-open-api-2chh */
 app.MapPost("/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
     UserDto loginattempt = db.UserDtos.SingleOrDefault(u => u.username == user.username);
-    //User user = db.User.SingleOrDefault(o => o.Email == user1.Email)       
+    /*
+    if the user is not found it will return 401
+    */
     if(user.username == loginattempt.username
     && loginattempt.password == Convert.ToBase64String(KeyDerivation.Pbkdf2(
             password: user.password,
@@ -148,7 +152,8 @@ app.MapPost("/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
     return Results.Unauthorized();
 });
 
-app.MapPost("/signup", [AllowAnonymous] async (UserDto user, UserDb db)=> {
+/* sign the user up, requires to be logged in */
+app.MapPost("/signup", [Authorize] async (UserDto user, UserDb db)=> {
     // generate a 128-bit salt using a cryptographically strong random sequence of nonzero values
         user.salt = new byte[128 / 8];
         using (var rngCsp = new RNGCryptoServiceProvider())
@@ -165,6 +170,27 @@ app.MapPost("/signup", [AllowAnonymous] async (UserDto user, UserDb db)=> {
     await db.SaveChangesAsync();
 
     return Results.Created($"/users/{user.userId}", user);
+});
+/* PUT request to change password of a user */
+app.MapPut("/changePassword", [Authorize] async (passwordChange pc, UserDb db)=> {
+    UserDto foundUser = db.UserDtos.SingleOrDefault(u => u.username == pc.username);
+    if (foundUser is null)
+    {
+        return Results.NotFound();
+    }
+    var updatedUser = await db.UserDtos.FindAsync(foundUser.userId);
+    //if note is found then
+    string hashed = Convert.ToBase64String(KeyDerivation.Pbkdf2(
+            password: pc.newPassword,
+            salt: foundUser.salt,
+            prf: KeyDerivationPrf.HMACSHA256,
+            iterationCount: 100000,
+            numBytesRequested: 256 / 8));
+    updatedUser.password = hashed;
+    //updatedUser.userUpdated = DateTime.Now;
+    await db.SaveChangesAsync();
+
+    return Results.Ok();
 });
 
 app.Run();
@@ -201,6 +227,8 @@ record Note(int id){
 
     public DateTime updated { get; set; } = default!;
 }
+
+record passwordChange(string username, string newPassword);
 /*
 Todo:
 ● Id: Unique identifier
