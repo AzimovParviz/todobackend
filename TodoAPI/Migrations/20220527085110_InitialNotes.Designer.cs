@@ -8,11 +8,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace NotesMinimalAPI.Migrations.UserDbMigrations
+namespace NotesMinimalAPI.Migrations
 {
-    [DbContext(typeof(UserDb))]
-    [Migration("20220526091357_userdbmigration")]
-    partial class userdbmigration
+    [DbContext(typeof(NoteDb))]
+    [Migration("20220527085110_InitialNotes")]
+    partial class InitialNotes
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -23,35 +23,37 @@ namespace NotesMinimalAPI.Migrations.UserDbMigrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("UserDto", b =>
+            modelBuilder.Entity("Note", b =>
                 {
-                    b.Property<int>("userId")
+                    b.Property<int>("id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("userId"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("id"));
 
-                    b.Property<string>("email")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("password")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("userCreated")
+                    b.Property<DateTime>("created")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime>("userUpdated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("username")
+                    b.Property<string>("name")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.HasKey("userId");
+                    b.Property<int>("status")
+                        .HasColumnType("integer");
 
-                    b.ToTable("UserDtos");
+                    b.Property<string>("text")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("updated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("userId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("id");
+
+                    b.ToTable("Notes");
                 });
 #pragma warning restore 612, 618
         }

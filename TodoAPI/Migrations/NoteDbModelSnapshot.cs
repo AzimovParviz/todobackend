@@ -36,9 +36,8 @@ namespace NotesMinimalAPI.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("status")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("status")
+                        .HasColumnType("integer");
 
                     b.Property<string>("text")
                         .IsRequired()

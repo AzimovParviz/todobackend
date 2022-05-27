@@ -86,7 +86,6 @@ app.MapPut("/api/v1/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db
 
     var note = await db.Notes.FindAsync(id);
     if(note is null) return Results.NotFound();
-
     //if note is found then
     note.text = n.text;
     note.status = n.status;
@@ -153,7 +152,7 @@ app.MapPost("/api/v1/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
 });
 
 /* sign the user up, requires to be logged in */
-app.MapPost("/api/v1/signup", [Authorize] async (UserDto user, UserDb db)=> {
+app.MapPost("/api/v1/signup", [AllowAnonymous] async (UserDto user, UserDb db)=> {
     // generate a 128-bit salt using a cryptographically strong random sequence of nonzero values
         user.salt = new byte[128 / 8];
         using (var rngCsp = new RNGCryptoServiceProvider())
@@ -215,12 +214,16 @@ User:
 ● Updated timestamp: When the user is last updated
 
 */
-
+public enum Status
+    {
+        NotStarted, 
+        OnGoing, 
+        Completed
+    }
 record Note(int id){
     public string text {get;set;} = default!;
     public string name { get; set; } = default!;
-    public string status {get;set;} = default!;//needs to be enum
-
+    public Status status { get; set; }
     public int userId { get; set; } = default!;
 
     public DateTime created { get; set; } = default!;
