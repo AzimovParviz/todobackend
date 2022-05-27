@@ -69,12 +69,20 @@ app.MapPost("/api/v1/notes/", [Authorize] async(Note n, NoteDb db)=> {
     return Results.Created($"/notes/{n.id}", n);
 });
 
-/* GET request */
+/* GET request by ID of the note*/
 app.MapGet("/api/v1/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
     return await db.Notes.FindAsync(id)
         is Note n
         ? Results.Ok(n)
         : Results.NotFound();
+});
+/* GET by status of the todo */
+app.MapGet("/api/v1/notes/status/{status:int}", [Authorize] async(int status, NoteDb db)=> {
+    string query  = "SELECT * FROM \"Notes\" WHERE status="+status;
+    var note = db.Notes
+    .FromSqlRaw(query)
+    .ToList();
+    return note;
 });
 
 /* PUT request to update the note*/
