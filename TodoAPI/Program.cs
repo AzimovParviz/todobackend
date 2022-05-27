@@ -91,7 +91,7 @@ app.MapPut("/api/v1/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db
     note.status = n.status;
     note.name = n.name;
     note.userId = n.userId;
-    note.updated = DateTime.Now;
+    note.updated = DateTime.UtcNow;
     await db.SaveChangesAsync();
     return Results.Ok();
 });
@@ -186,7 +186,7 @@ app.MapPut("/api/v1/changePassword", [Authorize] async (passwordChange pc, UserD
             iterationCount: 100000,
             numBytesRequested: 256 / 8));
     updatedUser.password = hashed;
-    updatedUser.userUpdated = DateTime.Now;
+    updatedUser.userUpdated = DateTime.UtcNow;
     await db.SaveChangesAsync();
 
     return Results.Ok();
@@ -200,9 +200,7 @@ record UserDto (string username)
     public byte[] salt { get; set; } 
     public string password { get; set; }
     public string email { get; set; } = default!;
-
-    public DateTime userCreated { get; set; } = default!;
-
+    public DateTime userCreated { get; set; } = DateTime.UtcNow;    
     public DateTime userUpdated { get; set; } = default!;
 }
 /*
@@ -225,8 +223,7 @@ record Note(int id){
     public string name { get; set; } = default!;
     public Status status { get; set; }
     public int userId { get; set; } = default!;
-
-    public DateTime created { get; set; } = default!;
+    public DateTime created { get; set; } = DateTime.UtcNow;
 
     public DateTime updated { get; set; } = default!;
 }
