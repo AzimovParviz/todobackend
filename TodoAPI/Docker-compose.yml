@@ -13,5 +13,12 @@ services:
 
   counter-image:
     build: ./
+    environment:
+    ASPNETCORE_HTTPS_PORT: 6001
+    ASPNETCORE_ENVIRONMENT: Development
+    ASPNETCORE_Kestrel__Certificates__Default__Path: /root/.aspnet/https/ApiHost.pfx
+    ASPNETCORE_Kestrel__Certificates__Default__Password: <password>
+    volumes:
+    - ${USERPROFILE}\.aspnet\https:/root/.aspnet/https
     ports:
     - "8080:80"

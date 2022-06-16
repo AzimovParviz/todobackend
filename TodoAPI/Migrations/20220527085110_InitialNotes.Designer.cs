@@ -10,7 +10,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace NotesMinimalAPI.Migrations
 {
-    [DbContext(typeof(NoteDb))]
+    [DbContext(typeof(TodoAPI.Notes.NoteDb))]
     [Migration("20220527085110_InitialNotes")]
     partial class InitialNotes
     {

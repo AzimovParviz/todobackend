@@ -19,9 +19,9 @@ builder.Services.AddSwaggerGen();
 // Connect to PostgreSQL Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var userConnectionString = builder.Configuration.GetConnectionString("UserConnection");
-builder.Services.AddDbContext<NoteDb>(options =>
+builder.Services.AddDbContext<TodoAPI.Notes.NoteDb>(options =>
     options.UseNpgsql(connectionString));
-builder.Services.AddDbContext<UserDb>(options=> 
+builder.Services.AddDbContext<TodoAPI.Users.UserDb>(options=>
     options.UseNpgsql(userConnectionString));
 // Add JWT configuration
 builder.Services.AddAuthentication(o =>
@@ -59,10 +59,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/api/v1", () => "Welcome to Notes API!");
-app.MapGet("/api/v1/notes", [Authorize] async (NoteDb db) => await db.Notes.ToListAsync());
+app.MapGet("/api/v1/notes", [Authorize] async (TodoAPI.Notes.NoteDb db) => await db.Notes.ToListAsync());
 
 /* POST request for the Note(Todo) item */
-app.MapPost("/api/v1/notes/", [Authorize] async(Note n, NoteDb db)=> {
+app.MapPost("/api/v1/notes/", [Authorize] async(TodoAPI.DTOs.Note n, TodoAPI.Notes.NoteDb db)=> {
     db.Notes.Add(n);
     await db.SaveChangesAsync();
 
@@ -70,14 +70,14 @@ app.MapPost("/api/v1/notes/", [Authorize] async(Note n, NoteDb db)=> {
 });
 
 /* GET request by ID of the note*/
-app.MapGet("/api/v1/notes/{id:int}", [Authorize] async(int id, NoteDb db)=> {
+app.MapGet("/api/v1/notes/{id:int}", [Authorize] async(int id, TodoAPI.Notes.NoteDb db)=> {
     return await db.Notes.FindAsync(id)
-        is Note n
+        is TodoAPI.DTOs.Note n
         ? Results.Ok(n)
         : Results.NotFound();
 });
 /* GET by status of the todo */
-app.MapGet("/api/v1/notes/status/{status:int}", [Authorize] async(int status, NoteDb db)=> {
+app.MapGet("/api/v1/notes/status/{status:int}", [Authorize] async(int status, TodoAPI.Notes.NoteDb db)=> {
     string query  = "SELECT * FROM \"Notes\" WHERE status="+status;
     var note = db.Notes
     .FromSqlRaw(query)
@@ -86,7 +86,7 @@ app.MapGet("/api/v1/notes/status/{status:int}", [Authorize] async(int status, No
 });
 
 /* PUT request to update the note*/
-app.MapPut("/api/v1/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db)=> {
+app.MapPut("/api/v1/notes/{id:int}", [Authorize] async(int id, TodoAPI.DTOs.Note n, TodoAPI.Notes.NoteDb db)=> {
     if (n.id != id)
     {
         return Results.BadRequest();
@@ -105,7 +105,7 @@ app.MapPut("/api/v1/notes/{id:int}", [Authorize] async(int id, Note n, NoteDb db
 });
 
 /* DELETE request */
-app.MapDelete("/api/v1/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
+app.MapDelete("/api/v1/notes/{id:int}", [Authorize] async(int id, TodoAPI.Notes.NoteDb db)=>{
     var note = await db.Notes.FindAsync(id);
     if (note is not null) {
         db.Notes.Remove(note);
@@ -116,8 +116,8 @@ app.MapDelete("/api/v1/notes/{id:int}", [Authorize] async(int id, NoteDb db)=>{
 
 /* SIGNIN request */
 /* https://dev.to/moe23/net-6-minimal-api-authentication-jwt-with-swagger-and-open-api-2chh */
-app.MapPost("/api/v1/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
-    UserDto loginattempt = db.UserDtos.SingleOrDefault(u => u.username == user.username);
+app.MapPost("/api/v1/signin", [AllowAnonymous] (TodoAPI.DTOs.User user, TodoAPI.Users.UserDb db) => {
+    TodoAPI.DTOs.User loginattempt = db.Users.SingleOrDefault(u => u.username == user.username);
     /*
     if the user is not found it will return 401
     */
@@ -160,7 +160,7 @@ app.MapPost("/api/v1/signin", [AllowAnonymous] (UserDto user, UserDb db) => {
 });
 
 /* sign the user up, requires to be logged in */
-app.MapPost("/api/v1/signup", [AllowAnonymous] async (UserDto user, UserDb db)=> {
+app.MapPost("/api/v1/signup", [AllowAnonymous] async (TodoAPI.DTOs.User user, TodoAPI.Users.UserDb db)=> {
     // generate a 128-bit salt using a cryptographically strong random sequence of nonzero values
         user.salt = new byte[128 / 8];
         using (var rngCsp = new RNGCryptoServiceProvider())
@@ -173,19 +173,19 @@ app.MapPost("/api/v1/signup", [AllowAnonymous] async (UserDto user, UserDb db)=>
             prf: KeyDerivationPrf.HMACSHA256,
             iterationCount: 100000,
             numBytesRequested: 256 / 8));
-    db.UserDtos.Add(user);
+    db.Users.Add(user);
     await db.SaveChangesAsync();
 
     return Results.Created($"/users/{user.userId}", user);
 });
 /* PUT request to change password of a user */
-app.MapPut("/api/v1/changePassword", [Authorize] async (passwordChange pc, UserDb db)=> {
-    UserDto foundUser = db.UserDtos.SingleOrDefault(u => u.username == pc.username);
+app.MapPut("/api/v1/changePassword", [Authorize] async (TodoAPI.DTOs.passwordChange pc, TodoAPI.Users.UserDb db)=> {
+    TodoAPI.DTOs.User foundUser = db.Users.SingleOrDefault(u => u.username == pc.username);
     if (foundUser is null)
     {
         return Results.NotFound();
     }
-    var updatedUser = await db.UserDtos.FindAsync(foundUser.userId);
+    var updatedUser = await db.Users.FindAsync(foundUser.userId);
     //if note is found then
     string hashed = Convert.ToBase64String(KeyDerivation.Pbkdf2(
             password: pc.newPassword,
@@ -201,62 +201,3 @@ app.MapPut("/api/v1/changePassword", [Authorize] async (passwordChange pc, UserD
 });
 
 app.Run();
-record UserDto (string username)
-{
-    [Key]
-    public int userId { get; set; }
-    public byte[] salt { get; set; } 
-    public string password { get; set; }
-    public string email { get; set; } = default!;
-    public DateTime userCreated { get; set; } = DateTime.UtcNow;    
-    public DateTime userUpdated { get; set; } = default!;
-}
-/*
-User:
-● Id: Unique identifier
-● Email: Email address
-● Password: Hash of the password
-● Created timestamp: When the user is created
-● Updated timestamp: When the user is last updated
-
-*/
-public enum Status
-    {
-        NotStarted, 
-        OnGoing, 
-        Completed
-    }
-record Note(int id){
-    public string text {get;set;} = default!;
-    public string name { get; set; } = default!;
-    public Status status { get; set; }
-    public int userId { get; set; } = default!;
-    public DateTime created { get; set; } = DateTime.UtcNow;
-
-    public DateTime updated { get; set; } = default!;
-}
-
-record passwordChange(string username, string newPassword);
-/*
-Todo:
-● Id: Unique identifier
-● Name: Name of the todo item
-● Description (optional): Description of the toto item
-● User id: Id of the user who owns this todo item
-● Created timestamp: When the item is created
-● Updated timestamp: When the item is last updated
-● Status: An enum of either: NotStarted, OnGoing, Completed
-*/
-
-class NoteDb: DbContext {
-    public NoteDb(DbContextOptions<NoteDb> options): base(options) {
-
-    }
-    public DbSet<Note> Notes => Set<Note>();
-}
-class UserDb: DbContext {
-    public UserDb(DbContextOptions<UserDb> options): base(options) {
-
-    }
-    public DbSet<UserDto> UserDtos => Set<UserDto>();
-}

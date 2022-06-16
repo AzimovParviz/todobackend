@@ -9,7 +9,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace NotesMinimalAPI.Migrations
 {
-    [DbContext(typeof(NoteDb))]
+    [DbContext(typeof(TodoAPI.Notes.NoteDb))]
     partial class NoteDbModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
